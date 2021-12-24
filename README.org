@@ -1,0 +1,8 @@
+* FamilyTree
+A very simple system for building and querying familytrees using text.
+** Run the program
+Assuming you have elixir's ~iex~ setup, load the file and run ~Interaction.main()~. That should start a miniature text interface where you can define and query relationships.
+** Writing
+You define relationships with the syntax ~relationship entity1 entity2~, which corresponds to saying that "<entity1> is the <relationship> of <entity2>". For instance ~parent a b~ means "a is the parent of b", and this information is saved to a directed graph.
+** Reading
+~entity1 entity2~ gives the relationship between two entities if one can be found on the graph constructed so far. The program simplifies basic relationships, so if you define ~sibling a b~ and ~sibling b c~, ~a c~ should return ~sibling~ since it's transitive.
