@@ -1,2 +1,2 @@
-Code.load_file("familytree.ex")
+Code.require_file("familytree.ex")
 Interaction.main()

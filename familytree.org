@@ -1,4 +1,36 @@
 #+TITLE: Family Tree Data Structure
+* Contents :TOC:
+- [[#task-spec][Task Spec]]
+  - [[#build-up-a-partially-connected-graph-of-primitive-relationships][Build up a partially connected graph of primitive relationships]]
+  - [[#define-a-method-for-searching-across-this-graph][Define a method for searching across this graph]]
+  - [[#define-a-mapping-from-ordered-lists-to-names][Define a mapping from ordered lists to names]]
+  - [[#aside-using-directed-graphs][Aside: Using directed graphs]]
+- [[#user-story][User story]]
+  - [[#interface][Interface]]
+- [[#write][Write]]
+  - [[#primitives][Primitives]]
+- [[#query][Query]]
+  - [[#single-relationship][Single Relationship]]
+  - [[#multiple-relationships][Multiple Relationships]]
+  - [[#declaring-which-to-use][Declaring Which to Use]]
+- [[#mutability][Mutability]]
+- [[#parsing][Parsing]]
+- [[#simplification][Simplification]]
+- [[#mutiple-paths][Mutiple Paths]]
+- [[#getting-to-something-testable][Getting to something testable]]
+  - [[#setup-mixexs][Setup Mix.exs]]
+  - [[#unit-tests][Unit Tests]]
+- [[#making-it-work-on-edge-cases][Making it work on edge cases]]
+  - [[#finding-all-possible-paths-between-two-nodes-on-a-graph][Finding all possible paths between two nodes on a graph]]
+- [[#tests][Tests]]
+  - [[#greeks][Greeks]]
+  - [[#star-wars][Star Wars]]
+- [[#extensions][Extensions]]
+  - [[#inverse-query][Inverse Query]]
+  - [[#multiperson-query][Multiperson Query]]
+  - [[#expand-it-into-a-full-dsl-with-ability-to-query-if-people-are-siblings-etc][Expand it into a full DSL, with ability to query if people are siblings, etc]]
+  - [[#create-complex-relationships][Create complex relationships]]
+
 * Task Spec
 Build a family tree implementation using Elixir structs, Racket structs, or the CLOS.
 
@@ -73,7 +105,8 @@ end
 - marriage [MUTUAL]
 
 * Query
-~(relationship vert1 vert2)~
+~(vert1 vert2)~
+
 List of atoms, basically
 Can be a macro or a function
 Macro is nice, because we get extensibility and we can call this a DSL.
@@ -94,42 +127,54 @@ defmodule QueryTree do
     chunk_every(lst, 2, 1, :discard)
   end
 
+  def process(path, tree) do
 
-  @type expr :: {atom, atom}
-
-  # @spec query(expr) :: [{atom}]
-  def query({v1, v2}, tree) do
-    # List of vertex structs
-    vertices = get_shortest_path(tree, v1, v2)
-    pairs = make_pairs(vertices) # FIXME
+    pairs = make_pairs(path) # FIXME
     edges = map(pairs, fn [v1, v2] -> edges(tree, v1, v2) end)
- #+end_src
-    Really, we only care about the ordered list of labels
-    Each elem of edges is a list of edges between two points.
-    It's a directed graph, so only labels going in the proper direction show up. Hopefully.
-
-    #+begin_src elixir :tangle yes
     labels = map(map(edges, &hd/1), fn x -> x.label end)
-
-    breadcrumbed =
+    _breadcrumbed =
       map(map(edges, &hd/1), fn x ->
         %Graph.Edge{label: l, v2: v} = x
         # EG: {:child, :vader}
         {l, v}
       end)
-
    # breadcrumbed
     if pairs != [] do
       Simplifier.collapse_compounds(labels)
     else
       "No Valid Path Found"
-
     end
-  end
+    end
+#+end_src
+# We return an ordered list of primitive relationships, ~breadcrumbed~.
+If we want to leave a breadcrumb trail of who we relate to at every step, just do breadcrumbed instead. If we want to strip out this info, simplify and return labels.
+** Single Relationship
+#+begin_src elixir :tangle yes
+  # @spec query(expr) :: [{atom}]
+  def query_single({v1, v2}, tree) do
+    # List of vertex structs
+    vertices = get_shortest_path(tree, v1, v2)
+    process(vertices, tree)
+    end
+ #+end_src
+    Really, we only care about the ordered list of labels
+    Each elem of edges is a list of edges between two points.
+    It's a directed graph, so only labels going in the proper direction show up. Hopefully.
+** Multiple Relationships
+#+begin_src elixir :tangle yes
+  def query_multiple({v1, v2}, tree) do
+    # List of vertex structs
+    paths= get_paths(tree, v1, v2)
+    for path <- paths do
+      process(path, tree)
+    end
+    end
+ #+end_src
+** Declaring Which to Use
+#+begin_src elixir :tangle yes
+def query(tuple, tree) do query_multiple(tuple, tree) end
 end
 #+end_src
-We return an ordered list of primitive relationships, ~breadcrumbed~.
-# If we want to leave a breadcrumb trail of who we relate to at every step, just do breadcrumbed instead. If we want to strip out this info, return labels
 * Mutability
 The add edge function is non-mutating, alas. So we need a way to keep track of state. So I guess we're using a GenServer, which means processes need to work. Then we can have a server process keep track of the graph, and call parse and handle
 Refactor: We need to pass tree in as a param to all functions which rely on it in all of our calls, rather than assuming it's handled by a global variable.
@@ -159,7 +204,6 @@ defmodule GraphState do
 
   def add_edge(_pid, expr) do
     Agent.update(@name, &DefineEdge.new_relationship(expr, &1))
-    expr
   end
 
   def get_graph(_pid) do
@@ -220,6 +264,7 @@ defmodule Interaction do
   import Interpreter
   def main() do
     familytree= GraphState.new()
+    IO.puts("Welcome to the Family Tree builder.")
     repl(familytree)
 
   end
@@ -285,6 +330,7 @@ end
 
 If KWlist: Map from atoms to lists of atoms. So call it... Not doing this.
 If Hashmap: Make a list of keys sorted descending in len(key), since key is a list. Then, call collapse list, key, val in comprehension
+* Mutiple Paths
 * Getting to something testable
 ** COMMENT How to do something like a global variable
 See the discussion on mutability

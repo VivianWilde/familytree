@@ -42,33 +42,41 @@ defmodule QueryTree do
     chunk_every(lst, 2, 1, :discard)
   end
 
+  def process(path, tree) do
 
-  @type expr :: {atom, atom}
-
-  # @spec query(expr) :: [{atom}]
-  def query({v1, v2}, tree) do
-    # List of vertex structs
-    vertices = get_shortest_path(tree, v1, v2)
-    pairs = make_pairs(vertices) # FIXME
+    pairs = make_pairs(path) # FIXME
     edges = map(pairs, fn [v1, v2] -> edges(tree, v1, v2) end)
-
     labels = map(map(edges, &hd/1), fn x -> x.label end)
-
-    breadcrumbed =
+    _breadcrumbed =
       map(map(edges, &hd/1), fn x ->
         %Graph.Edge{label: l, v2: v} = x
         # EG: {:child, :vader}
         {l, v}
       end)
-
    # breadcrumbed
     if pairs != [] do
       Simplifier.collapse_compounds(labels)
     else
       "No Valid Path Found"
-
     end
-  end
+    end
+
+  # @spec query(expr) :: [{atom}]
+  def query_single({v1, v2}, tree) do
+    # List of vertex structs
+    vertices = get_shortest_path(tree, v1, v2)
+    process(vertices, tree)
+    end
+
+  def query_multiple({v1, v2}, tree) do
+    # List of vertex structs
+    paths= get_paths(tree, v1, v2)
+    for path <- paths do
+      process(path, tree)
+    end
+    end
+
+def query(tuple, tree) do query_multiple(tuple, tree) end
 end
 
 defmodule GraphState do
@@ -83,7 +91,6 @@ defmodule GraphState do
 
   def add_edge(_pid, expr) do
     Agent.update(@name, &DefineEdge.new_relationship(expr, &1))
-    expr
   end
 
   def get_graph(_pid) do
@@ -123,6 +130,7 @@ defmodule Interaction do
   import Interpreter
   def main() do
     familytree= GraphState.new()
+    IO.puts("Welcome to the Family Tree builder.")
     repl(familytree)
 
   end
