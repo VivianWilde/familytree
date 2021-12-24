@@ -34,7 +34,8 @@ defmodule QueryTree do
   import Enum
 
   # @spec make_pairs(nonempty_list) :: [list]
-  def make_pairs([]) do nil end
+  def make_pairs([]) do [] end
+  def make_pairs(nil) do [] end
 
   def make_pairs(lst) do
     # Make a list [a b c d] into [a|b] [b|c] [c|d]. So a list of vertices to a list of edges, basically
@@ -61,7 +62,12 @@ defmodule QueryTree do
       end)
 
    # breadcrumbed
-    Simplifier.collapse_compounds(breadcrumbed)
+    if pairs != [] do
+      Simplifier.collapse_compounds(labels)
+    else
+      "No Valid Path Found"
+
+    end
   end
 end
 
@@ -71,13 +77,17 @@ defmodule GraphState do
     Agent.start_link(fn -> Graph.new() end, name: @name)
   end
 
-  def query(pid, expr) do
+  def query(_pid, expr) do
     Agent.get(@name, &QueryTree.query(expr, &1))
   end
 
-  def add_edge(pid, expr) do
+  def add_edge(_pid, expr) do
     Agent.update(@name, &DefineEdge.new_relationship(expr, &1))
     expr
+  end
+
+  def get_graph(_pid) do
+    Agent.get(@name, fn x -> x end)
   end
 end
 
@@ -91,6 +101,10 @@ def parse(str) do
   map(split(str), &to_atom/1)
 end
 
+def handle([:graph]) do
+  &get_graph(&1)
+end
+
 def handle([relationship, v1, v2]) do
   # DefineEdge.new_relationship({relationship, v1, v2})
   &add_edge(&1, {relationship, v1, v2})
@@ -99,11 +113,14 @@ end
 def handle([v1, v2]) do
   &query(&1, {v1, v2})
 end
+
+def handle(_anything_else) do
+  fn _x -> "Invalid Input" end
+end
 end
 
 defmodule Interaction do
   import Interpreter
-  import GraphState
   def main() do
     familytree= GraphState.new()
     repl(familytree)
@@ -124,8 +141,6 @@ defmodule Interaction do
 end
 
 defmodule Simplifier do
-  import Enum
-  import List
   @compound_relationships %{
     [:parent, :parent] => :grandparent,
     [:sibling, :sibling] => :sibling
@@ -137,7 +152,7 @@ defmodule Simplifier do
 
   def collapse(list, sublist, replacement) do
     if List.starts_with?(list, sublist) do
-      replacement ++ collapse(Enum.slice(list, length(sublist), length(list)), sublist, replacement)
+      [replacement] ++ collapse(Enum.slice(list, length(sublist), length(list)), sublist, replacement)
     else
       [hd(list) | collapse(tl(list), sublist, replacement)]
     end
